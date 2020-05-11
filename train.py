@@ -28,8 +28,8 @@ def data_loader_preparation(data_choice,
         return SetInit(path_images, mode=mode, transform=transform_opt)
 
     train_set = init_dataset(path_img, "train")
-    val_set = init_dataset(path_img, "train")
-    test_set = init_dataset(path_img, "val")
+    val_set = init_dataset(path_img, "val")
+    test_set = init_dataset(path_img, "test")
 
     def init_loader(dataset):
         return TaskLoader(dataset,
