@@ -66,13 +66,12 @@ class ProtoNet(nn.Module):
         embeddings_s, embeddings_q = self.embedding(img_s), self.embedding(img_q)
         embeddings_proto, label_proto = self.proto_compute(embeddings_s, label_s)
 
-        # compute similarity and label matrix
+        # compute distance and label matrix
         dist_matrix = get_similarity_matrix(embeddings_proto, embeddings_q, euclidean_dis)
-        similarity_matrix = F.softmax(-dist_matrix, dim=-1)     # ...注意了，是距离的负数...
         label_matrix = get_label_matrix(label_proto, label_q)
 
         # compute the loss
-        loss = proto_loss(similarity_matrix, label_matrix)
+        loss = proto_loss(dist_matrix, label_matrix)    # similarity_matrix
         # compute the accuracy
         predict_q = label_proto[torch.argmin(dist_matrix, dim=1)]
         correct_q = predict_q == label_q

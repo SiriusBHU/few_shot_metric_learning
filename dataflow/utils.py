@@ -252,7 +252,7 @@ class TaskLoader(object):
         self.task_batch_sampler = task_batch_sampler
         self.data_loader = DataLoader(self.data_source,
                                       batch_sampler=self.task_batch_sampler,
-                                      num_workers=num_workers)
+                                      num_workers=num_workers, pin_memory=True)
         self.batch_shuffle = batch_shuffle
 
     def _check_n_way_k_shot_satisfied(self, n_way, k_shot, query_shot):
@@ -274,7 +274,6 @@ class TaskLoader(object):
     def __iter__(self):
 
         for samples, labels in self.data_loader:
-
             cur_task_starts = self.task_batch_sampler.cur_task_num
             s_samples, q_samples, s_labels, q_labels = [], [], [], []
 

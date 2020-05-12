@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-from torch.nn.init import xavier_uniform_
+from torch.nn.init import kaiming_uniform_
 from dataflow.omniglot_load import OmniglotVinyals
 from dataflow.miniImage_load import MiniImageNet
 from dataflow.utils import TaskLoader
@@ -11,15 +11,16 @@ import os
 
 def data_loader_preparation(data_choice,
                             transform_opt,
-                            iterations,
-                            n_way, k_shot, query_shot,
+                            train_iterations, test_iterations,
+                            train_way, train_shot, train_query,
+                            test_way, test_shot, test_query,
                             batch_shuffle, task_shuffle):
 
     if data_choice == 'Omniglot':
         path_img = "E:\\Transferring_Datasets\\Omniglot"
         SetInit = OmniglotVinyals
     elif data_choice == 'miniImageNet':
-        path_img = "E:\\Transferring_Datasets\\Mini_ImageNet"
+        path_img = "D:\\Transferring_Datasets\\Mini_ImageNet"
         SetInit = MiniImageNet
     else:
         raise AttributeError("error")
@@ -31,17 +32,17 @@ def data_loader_preparation(data_choice,
     val_set = init_dataset(path_img, "val")
     test_set = init_dataset(path_img, "test")
 
-    def init_loader(dataset):
+    def init_loader(dataset, iterations, way, shot, query):
         return TaskLoader(dataset,
                           iterations=iterations,
-                          n_way=n_way, k_shot=k_shot, query_shot=query_shot,
+                          n_way=way, k_shot=shot, query_shot=query,
                           batch_shuffle=batch_shuffle,
                           task_shuffle=task_shuffle,
                           num_workers=2)
 
-    train_loader = init_loader(train_set)
-    val_loader = init_loader(val_set)
-    test_loader = init_loader(test_set)
+    train_loader = init_loader(train_set, train_iterations, train_way, train_shot, train_query)
+    val_loader = init_loader(val_set, test_iterations, test_way, train_shot, train_query)
+    test_loader = init_loader(test_set, test_iterations, test_way, test_shot, test_query)
 
     return train_loader, val_loader, test_loader
 
@@ -50,31 +51,29 @@ def weight_init(m):
 
     class_name = m.__class__.__name__
     if class_name.find('Conv') != -1:
-        xavier_uniform_(m.weight.data)
+        kaiming_uniform_(m.weight.data)
     if class_name.find('Linear') != -1:
-        xavier_uniform_(m.weight.data)
+        kaiming_uniform_(m.weight.data)
+    if class_name.find('BatchNorm') != -1:
+        torch.nn.init.uniform_(m.weight)
 
 
 class NetFlow(object):
 
-    def __init__(self, net, epochs,
-                 learning_rate,
-                 weight_decay,
-                 lr_scheduler_step,
-                 lr_scheduler_gamma,
+    def __init__(self,
+                 net,
+                 optimizer,
+                 lr_scheduler,
+                 epochs,
                  iterations,
                  display_epoch=5):
 
         self.net = net
-        self.epochs = epochs
-
-        # optimizer parameter
-        self.learning_rate = learning_rate
-        self.weight_decay = weight_decay
-        self.lr_scheduler_step = lr_scheduler_step
-        self.lr_scheduler_gamma = lr_scheduler_gamma
+        self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
 
         # epoch to display evaluation result
+        self.epochs = epochs
         self.display_epoch = display_epoch
         self.iterations = iterations
 
@@ -87,28 +86,26 @@ class NetFlow(object):
         if is_dump:
             self.make_dump_directory(net_name)
 
-        # set optimizer
-        optimizer = optim.Adam(self.net.parameters(),
-                               lr=self.learning_rate,
-                               weight_decay=self.weight_decay)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer,
-                                                 gamma=self.lr_scheduler_gamma,
-                                                 step_size=self.lr_scheduler_step)
+        # set net, optimizer, lr_scheduler
+        net = self.net
+        optimizer = self.optimizer
+        lr_scheduler = self.lr_scheduler
 
         # initialization
-        self.net.apply(weight_init)
-        self.net.cuda()
+        net.apply(weight_init)
+        net.cuda()
 
         # training period
         LOSS_train, ACC_train, LOSS_val, ACC_val = [], [], [], []
         for epoch in range(EPOCHS):
-            self.net.train()
+
+            net.train()
             acc_train, loss_train, t1 = [], [], time.time()
             for i, (imgs_s, labels_s, imgs_q, labels_q) in enumerate(train_loader):
                 # feed-forward
                 imgs_s, imgs_q = imgs_s.cuda(), imgs_q.cuda()
                 labels_s, labels_q = labels_s.cuda(), labels_q.cuda()
-                _acc, _loss = self.net(imgs_s, imgs_q, labels_s, labels_q)
+                _acc, _loss = net(imgs_s, imgs_q, labels_s, labels_q)
 
                 # feed-back
                 optimizer.zero_grad()
@@ -116,32 +113,36 @@ class NetFlow(object):
                 optimizer.step()
 
                 acc_train.append(_acc), loss_train.append(_loss.item())
+                print("[iteration: %3d] -- [loss: %.5f] -- [acc: %.5f]" %
+                      (i + 1, _loss.item(), _acc))
             # record result and show
             LOSS_train.append(loss_train[:self.iterations])
             ACC_train.append(acc_train[:self.iterations])
-            print("[epoch: %4d] -- [loss: %.5f] -- [acc: %.5f] -- [time consuming: %.5fs]" %
-                  (epoch + 1, sum(loss_train) / len(loss_train), sum(acc_train) / len(acc_train), time.time() - t1))
 
             # upgrade learning rate
-            lr_scheduler.step()
+            lr_scheduler.step(epoch)
 
             # ------- evaluate the network on validation_loader --------
-            self.net.eval()
+            net.eval()
             acc_val, loss_val = [], []
             with torch.no_grad():
                 for i, (imgs_s, labels_s, imgs_q, labels_q) in enumerate(val_loader):
                     imgs_s, imgs_q = imgs_s.cuda(), imgs_q.cuda()
                     labels_s, labels_q = labels_s.cuda(), labels_q.cuda()
-                    _acc, _loss = self.net(imgs_s, imgs_q, labels_s, labels_q)
+                    _acc, _loss = net(imgs_s, imgs_q, labels_s, labels_q)
 
                     acc_val.append(_acc), loss_val.append(_loss.item())
             LOSS_val.append(loss_val[:self.iterations])
             ACC_val.append(acc_val[:self.iterations])
-            if (epoch + 1) % self.display_epoch == 0:
-                print("====> Validation -- [loss: %.5f] -- [acc: %.5f]" %
-                      (sum(loss_val) / len(loss_val), sum(acc_val) / len(acc_val)))
-                if is_dump:
-                    self.dump_param(net_name, epoch + 1)
+            print("Epoch: %3d -- Time Consumption: %.5fs\n"
+                  "====> Training:  -- [loss: %.5f] -- [acc: %.5f]\n"
+                  "====> Validation:-- [loss: %.5f] -- [acc: %.5f]\n" %
+                  (epoch + 1, time.time() - t1,
+                   sum(loss_train) / len(loss_train), sum(acc_train) / len(acc_train),
+                   sum(loss_val) / len(loss_val), sum(acc_val) / len(acc_val)))
+            if (epoch + 1) % self.display_epoch == 0 and is_dump:
+                self.dump_param(net_name, epoch + 1)
+
         return LOSS_train, ACC_train, LOSS_val, ACC_val
 
     def evaluation(self, test_loader):
@@ -197,41 +198,53 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
 
     # parameter setting
-    DATA_CHOICE = "miniImageNet"
+    DATA_CHOICE = 'miniImageNet'    # 'miniImageNet', 'Omniglot'
+    # TRANSFORM_OPT = transforms.Compose([transforms.Resize((84, 84)),
+    #                                     transforms.ToTensor(),
+    #                                     transforms.Normalize(mean=[0.9], std=[0.3])])
     TRANSFORM_OPT = transforms.Compose([transforms.Resize((84, 84)),
+                                        transforms.CenterCrop(84),
                                         transforms.ToTensor(),
-                                        transforms.Normalize(mean=[0.9], std=[0.3])])
-    N_WAY, K_SHOT, QUERY_SHOT = 5, 5, 5
+                                        transforms.Normalize(mean=(0.485, 0.456, 0.406),
+                                                             std=(0.229, 0.224, 0.225))])
+    TRAIN_WAY, TRAIN_SHOT, TRAIN_QUERY = 30, 1, 15
+    TEST_WAY, TEST_SHOT, TEST_QUERY = 5, 1, 30
     BATCH_SHUFFLE, TASK_SHUFFLE = True, True
-    LEARNING_RATE, WEIGHT_DECAY = 0.001, 0.0001
-    LR_SCHE_STEP, LR_SCHE_GAMMA = 20, 0.5
-    EPOCHS = 1000
-    ITERATIONS = 100
-    DISPLAY = 5
+    EPOCHS = 200
+    TRAIN_ITERATIONS = 100
+    TEST_ITERATIONS = 100
+    DISPLAY = 10
+
+    # net setting
+    from models.siamese_net import SiameseNet
+    from models.proto_net import ProtoNet
+    NET, NET_NAME = ProtoNet(3, 64, 64), "ProtoNet_Image"  # "ProtoNet_Image", "ProtoNet_Omniglot"
+    OPTIMIZER = optim.Adam(NET.parameters(), lr=1e-3)
+    LR_SCHE = optim.lr_scheduler.StepLR(OPTIMIZER, step_size=20, gamma=0.5)
+
 
     # data_preparation
     train_loader, val_loader, test_loader = data_loader_preparation(DATA_CHOICE,
                                                                     TRANSFORM_OPT,
-                                                                    ITERATIONS,
-                                                                    N_WAY, K_SHOT, QUERY_SHOT,
+                                                                    TRAIN_ITERATIONS, TEST_ITERATIONS,
+                                                                    TRAIN_WAY, TRAIN_SHOT, TRAIN_QUERY,
+                                                                    TEST_WAY, TEST_SHOT, TEST_QUERY,
                                                                     BATCH_SHUFFLE, TASK_SHUFFLE)
     # net flow instance
-    from models.siamese_net import SiameseNet
-    from models.prototype_net import ProtoNet
-    net_flow = NetFlow(ProtoNet(3, 64, 64), EPOCHS,         # ProtoNet(1, 64, 64), SiameseNet()
-                       learning_rate=LEARNING_RATE,
-                       lr_scheduler_step=LR_SCHE_STEP,
-                       lr_scheduler_gamma=LR_SCHE_GAMMA,
-                       iterations=ITERATIONS,
-                       display_epoch=DISPLAY,
-                       weight_decay=WEIGHT_DECAY)
+
+    net_flow = NetFlow(NET, optimizer=OPTIMIZER, lr_scheduler=LR_SCHE,
+                       epochs=EPOCHS,
+                       iterations=TRAIN_ITERATIONS,
+                       display_epoch=DISPLAY)
     # training
-    LOSS_train, ACC_train, LOSS_val, ACC_val = net_flow.train(train_loader, val_loader, "ProtoNet_Image", is_dump=True)
+    LOSS_train, ACC_train, LOSS_val, ACC_val = net_flow.train(train_loader, val_loader,
+                                                              NET_NAME,
+                                                              is_dump=True)
     # evaluation on testing set
     net_flow.evaluation(test_loader)
 
     # load parameter and evaluation on testing set
-    net_flow.load_param("ProtoNet")
+    net_flow.load_param(NET_NAME)
     net_flow.evaluation(test_loader)
 
     # show train result

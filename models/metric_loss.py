@@ -99,9 +99,14 @@ def pairwise_loss(sim_matrix, l_matrix, is_balance=False, e=1e-8):
     return _loss
 
 
-def proto_loss(similarity_matrix, label_matrix):
+def proto_loss(dist_matrix, label_matrix):
     label_matrix = torch.argmax(label_matrix, -1).long()
-    return torch.nn.CrossEntropyLoss()(similarity_matrix, label_matrix)
+    return F.cross_entropy(-dist_matrix, label_matrix)
+
+
+def relation_loss(similarity_matrix, label_matrix):
+    label_matrix = torch.argmax(label_matrix, -1).long()
+    return torch.nn.MSELoss()(similarity_matrix, label_matrix)
 
 
 l2_dis = euclidean_dis
