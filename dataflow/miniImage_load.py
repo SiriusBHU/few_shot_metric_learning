@@ -188,14 +188,16 @@ class MiniImageNet(VisionDataset):
         # cap = "=================================================================="
         head = self.mode.upper() + " DataSet " + self.__class__.__name__
         body = ["Root location: {}".format(self.root),
-                "Number of datapoints: {}".format(self.__len__()),
-                "Number of classes: {}".format(len(self.tasks))]
+                "\t\tNumber of datapoints: {}".format(self.__len__()),
+                "\t\tNumber of classes: {}".format(len(self.tasks))]
         s_nums = [len(self.tasks[idx]) for idx in range(len(self.tasks))]
         max_num, min_num = max(s_nums), min(s_nums)
-        body += ["Maximum samples' num per class: %d" % max_num,
-                 "Minimum samples' num per class: %d" % min_num,
+        body += ["\t\tMaximum samples' num per class: %d" % max_num,
+                 "\t\tMinimum samples' num per class: %d" % min_num,
+                 self.transforms.__repr__(),
                  "\n"]
-        return "\n" + head + "\n" + "\n\t\t".join(body)
+
+        return "\n" + head + "\n" + "\n".join(body)
 
     def clear_files(self):
         """

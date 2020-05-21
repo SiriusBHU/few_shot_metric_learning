@@ -97,6 +97,7 @@ class NetFlow(object):
 
         # training period
         LOSS_train, ACC_train, LOSS_val, ACC_val = [], [], [], []
+        MAX_ACC = 0
         for epoch in range(EPOCHS):
 
             net.train()
@@ -142,6 +143,9 @@ class NetFlow(object):
                    sum(loss_val) / len(loss_val), sum(acc_val) / len(acc_val)))
             if (epoch + 1) % self.display_epoch == 0 and is_dump:
                 self.dump_param(net_name, epoch + 1)
+            if sum(acc_val) / len(acc_val) > MAX_ACC:
+                self.dump_param(net_name + '_Best_ACC', epoch + 1)
+                MAX_ACC = sum(acc_val) / len(acc_val)
 
         return LOSS_train, ACC_train, LOSS_val, ACC_val
 
