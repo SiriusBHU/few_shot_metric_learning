@@ -170,10 +170,28 @@ class TieredImageNet(VisionDataset):
 
     def _find_classes_items(self, mode, extensions='jpg'):
 
-        # get ravi split info. file
-        cur_mode_file = os.path.join(self.path_split, mode)
-        with open(cur_mode_file, 'rb') as f:
-            label_info = pickle.load(f)
+        # get ren split info. file
+        if mode != 'trainval':
+            cur_mode_file = os.path.join(self.path_split, mode)
+            with open(cur_mode_file, 'rb') as f:
+                label_info = pickle.load(f)
+        else:
+            with open(os.path.join(self.path_split, 'train'), 'rb') as f:
+                label_info = pickle.load(f)
+
+            with open(os.path.join(self.path_split, 'test'), 'rb') as f:
+                _info = pickle.load(f)
+                _info['label_specific'] += len(label_info['label_specific_str'])
+                _info['label_general'] += len(label_info['label_general_str'].keys())
+
+                import numpy as np
+                label_info['label_specific'] = np.concatenate([_info['label_specific'],
+                                                               label_info['label_specific']],
+                                                              axis=0)
+                label_info['label_general'] = np.concatenate([_info['label_general'],
+                                                              label_info['label_general']],
+                                                             axis=0)
+                label_info['label_specific_str'].extend(_info['label_specific_str'])
 
         # get classes and the corresponding index of the current mode
         classes = label_info['label_specific_str']

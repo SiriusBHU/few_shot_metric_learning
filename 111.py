@@ -70,7 +70,14 @@ with open(os.path.join(directory, 'train'), 'rb') as fi:
 
 
 
+import os
+import pickle
+directory = 'E:\\Transferring_Datasets\\Tiered_ImageNet\\split'
+with open(os.path.join(directory, 'train'), 'rb') as fi:
+    entry = pickle.load(fi, encoding='latin1')
 
+with open(os.path.join(directory, 'val'), 'rb') as fi:
+    entry1 = pickle.load(fi, encoding='latin1')
 
 
 

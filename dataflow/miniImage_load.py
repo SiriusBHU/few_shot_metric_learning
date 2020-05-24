@@ -109,9 +109,9 @@ class MiniImageNet(VisionDataset):
         if mode is None:
             logging.info("default loading training task set")
             mode = 'train'
-        if mode not in ['train', 'val', 'test']:
+        if mode not in ['train', 'val', 'test', 'trainval']:
             raise ValueError("expected data-set mode should within choices of "
-                             "['train', 'val'(validation), 'test'], "
+                             "['train', 'val'(validation), 'trainval'(train + validation), 'test'], "
                              "but got {} instead\n".format(mode))
 
         # generate dataset
@@ -150,8 +150,15 @@ class MiniImageNet(VisionDataset):
     def _find_classes_items(self, mode, extensions='jpg'):
 
         # get ravi split info. file
-        cur_mode_file = os.path.join(self.path_split, mode + '.csv')
-        _items = pd.read_csv(cur_mode_file, sep=',').values
+        if mode != 'trainval':
+            cur_mode_file = os.path.join(self.path_split, mode + '.csv')
+            _items = pd.read_csv(cur_mode_file, sep=',').values
+        else:
+            _items = []
+            for _mode in ('train', 'val'):
+                _mode_file = os.path.join(self.path_split, _mode + '.csv')
+                _items.append(pd.read_csv(_mode_file, sep=',').values)
+            _items = np.concatenate(_items, axis=0)
 
         # get classes and the corresponding index of the current mode
         classes = list(np.unique(_items[:, -1]))

@@ -13,19 +13,21 @@
     Function:
 """
 from __future__ import print_function
+
 import logging
 import os
-import numpy as np
 import pickle
 import shutil
 import tarfile
+
+import numpy as np
 from six.moves import urllib
 from torchvision.datasets.vision import VisionDataset
+
 from dataflow.utils import make_taskset, pil_array_to_image
 
 
 class CIFAR100(VisionDataset):
-
     r"""
         Arguments:
             path_images (str, optional): the directory store Omniglot images.
@@ -45,9 +47,10 @@ class CIFAR100(VisionDataset):
     # define private values
     __img_url = "https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz"
     __fc100_protocol = {
-        'train': {1, 2, 3, 4, 5, 6, 9, 10, 15, 17, 18, 19},
-        'val': {8, 11, 13, 16},
-        'test': {0, 7, 12, 14}
+        'train': [1, 2, 3, 4, 5, 6, 9, 10, 15, 17, 18, 19],
+        'val': [8, 11, 13, 16],
+        'trainval': [1, 2, 3, 4, 5, 6, 9, 10, 15, 17, 18, 19, 8, 11, 13, 16],
+        'test': [0, 7, 12, 14],
     }
     __cifar_fs_protocol = {
         'train': [90, 76, 93, 66, 79, 53, 17, 39, 22, 57,
@@ -59,6 +62,14 @@ class CIFAR100(VisionDataset):
                   56, 49, 37, 23],
         'val': [55, 48, 87, 40, 27, 73, 14, 4, 7, 89,
                 32, 47, 15, 26, 71, 19],
+        'trainval': [90, 76, 93, 66, 79, 53, 17, 39, 22, 57,
+                     35, 72, 31, 0, 1, 13, 51, 64, 80, 20,
+                     85, 61, 97, 68, 50, 11, 74, 25, 82, 88,
+                     18, 43, 81, 41, 92, 33, 30, 24, 3, 63,
+                     6, 36, 45, 10, 16, 9, 91, 78, 12, 59,
+                     75, 44, 28, 38, 52, 29, 65, 54, 96, 67,
+                     56, 49, 37, 23, 55, 48, 87, 40, 27, 73,
+                     14, 4, 7, 89, 32, 47, 15, 26, 71, 19],
         'test': [2, 5, 8, 21, 34, 42, 46, 58, 60, 62,
                  69, 70, 77, 83, 84, 86, 94, 95, 98, 99]
     }
@@ -214,7 +225,6 @@ class CIFAR100(VisionDataset):
         # extract the corresponding data and targets
         data, targets, classes, class_to_idx = [], [], [], {}
         for new_idx, _idx in enumerate(class_idx):
-
             coord = fine_labels == _idx
             data.append(images[coord])
             targets.append(new_idx * np.ones((sum(coord),), dtype=np.int))
@@ -273,10 +283,10 @@ class CIFAR100(VisionDataset):
 if __name__ == "__main__":
 
     from torchvision import transforms
-    from dataflow.utils import TaskBatchSampler, TaskLoader
+    from dataflow.utils import TaskLoader
 
     path_cur = os.getcwd()
-    path_img = "E:\\Transferring_Datasets\\CIFAR100"   # path_cur + "/.."    "E:\\Transferring_Datasets\\Omniglot"
+    path_img = "E:\\Transferring_Datasets\\CIFAR100"  # path_cur + "/.."    "E:\\Transferring_Datasets\\Omniglot"
     fc100_set = CIFAR100(path_images=path_img,
                          protocol='fc100',
                          mode="train",
@@ -291,6 +301,7 @@ if __name__ == "__main__":
                               num_workers=2)
 
     import time
+
     t1 = time.time()
     for i, (s_samples, s_labels, q_samples, q_labels) in enumerate(fc100_loader):
         t2 = time.time()
