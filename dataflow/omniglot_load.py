@@ -26,7 +26,7 @@ class OmniglotVinyals(VisionDataset):
 
     r"""
         Arguments:
-            path_images (string, optional): the directory store Omniglot images.
+            path_images (string, optional): the directory store Omniglot data.
             mode (str, None, optional): within ['train', 'val', 'trainval', 'test'],
                 it decide to load which files for data-loader (default: None).
             loader (callable): A function to load a sample given its path.
@@ -53,33 +53,34 @@ class OmniglotVinyals(VisionDataset):
     def __init__(self,
                  path_images=None,
                  mode=None,
-                 loader=pil_grey_loader,  # default_loader,
+                 loader=pil_grey_loader,
                  transform=None,
                  target_transform=None):
 
         logging.basicConfig(level=logging.INFO,
                             format="[%(asctime)s--%(name)s--%(module)s--%(levelname)s]: %(message)s")
 
-        # check image path
+        # set image directory
         self.path_images = path_images
         if self.path_images is None:
             self.path_images = os.path.join(os.getcwd(), "dataset\\Omniglot")
-        # check data-set related directories do or not exist
+        # check the directory do or not exist
         if not os.path.exists(self.path_images):
-            logging.warning("no original Omniglot image path")
+            logging.warning("no original Omniglot image directory")
             os.makedirs(self.path_images)
 
-        # check the data-set has or hasn't been prepared
-        # if not, prepare dataset
-        self.path_processed = os.path.join(self.path_images, "processed_images")
-        # check the processed images directories do or not exist
+        # ------------------------------------------
+        # check the images have or not been prepared
+        # if not, prepare images
+        self.path_processed = os.path.join(self.path_images, "images")
+        # check the processed images directory does or not exist
         if not os.path.exists(self.path_processed):
-            logging.warning("no processed Omniglot image path")
+            logging.warning("no processed Omniglot image directory")
             os.makedirs(self.path_processed)
         # check the processed files do or not exist,
         # if no files, process origin image into the processed-path
         if len(os.listdir(self.path_processed)) < 50:
-            logging.warning("no processed Omniglot image files")
+            logging.warning("no processed images")
             # check if there has original images,
             # if no images, download and unzip them
             files = os.listdir(self.path_images)
@@ -89,10 +90,12 @@ class OmniglotVinyals(VisionDataset):
             # processing: move image to processed path
             self._process_image()
 
-        # check the train-validation-test split information has or hasn't been prepared
+        # -------------------------------------
+        # check the train-validation-test split
+        # information has or hasn't been prepared
         # if not, prepare
         self.path_split = os.path.join(self.path_images, "vinyals_split")
-        # check the split information directories do or not exist
+        # check the split information directory do or not exist
         if not os.path.exists(self.path_split):
             logging.warning("no Omniglot split info. path")
             os.makedirs(self.path_split)
@@ -102,11 +105,17 @@ class OmniglotVinyals(VisionDataset):
             logging.warning("no Omniglot split info. files")
             self._download_split_info()
 
-        # define the training or testing tasks root
-        # for class attribute print
-        super(OmniglotVinyals, self).__init__(self.path_processed,
+        # --------------------------------------
+        # after guaranteeing the images has been
+        # prepared in the setting path_images,
+        # set root and declare its father class
+        self.root = self.path_images
+        super(OmniglotVinyals, self).__init__(self.root,
                                               transform=transform,
                                               target_transform=target_transform)
+
+        # ---------------
+        # prepare dataset
 
         # check whether load train, validation, or test task set
         if mode is None:
@@ -117,16 +126,16 @@ class OmniglotVinyals(VisionDataset):
                              "['train', 'val'(validation), 'trainval'(train + validation), 'test'], "
                              "but got {} instead\n".format(mode))
 
-        # prepare data-set
-        classes, class_to_idx = self._find_classes_from_vinyals_protocol(mode)
+        # generate dataset
+        classes, class_to_idx = self._find_classes(mode)
         samples = self._find_items(self.root, class_to_idx, extensions="png")
         if len(samples) == 0:
-            raise (RuntimeError("Found 0 files in subfolders of: " + self.root + "\n"
+            raise (RuntimeError("Found 0 files in sub-folders of: " + self.root + "\n"
                                 "Supported file-type is *.png"))
-        # samples_idx_in_classes_idx
         tasks = make_taskset(samples, class_to_idx)
 
-        # setting param
+        # -------------
+        # set variables
         self.loader = loader
         self.mode = mode
         self.classes = classes
@@ -134,6 +143,7 @@ class OmniglotVinyals(VisionDataset):
         self.samples = samples
         self.targets = [s[-1] for s in samples]
         self.tasks = tasks
+        # print self information
         logging.info(self)
 
     def _download_images(self):
@@ -190,6 +200,7 @@ class OmniglotVinyals(VisionDataset):
         for _dir in ['images_background', 'images_evaluation']:
             for _subdir in os.listdir(os.path.join(self.path_images, _dir)):
                 shutil.move(os.path.join(self.path_images, _dir, _subdir), self.path_processed)
+            shutil.rmtree(os.path.join(self.path_images, _dir))
 
         # check move successfully
         if len(os.listdir(self.path_processed)) >= 50:
@@ -197,7 +208,7 @@ class OmniglotVinyals(VisionDataset):
         else:
             raise FileNotFoundError("moving error")
 
-    def _find_classes_from_vinyals_protocol(self, mode):
+    def _find_classes(self, mode):
 
         # get current mode classes from vinyals split info. file (with augmentation info)
         cur_mode_file = os.path.join(self.path_split, mode + '.txt')
@@ -242,9 +253,6 @@ class OmniglotVinyals(VisionDataset):
         sample = self.loader(path).rotate(_t)
         if self.transform is not None:
             sample = self.transform(sample)
-            # import numpy as np
-            # kkk = sample.numpy()
-            # mean, std = np.mean(kkk), np.std(kkk)
         if self.target_transform is not None:
             target = self.target_transform(target)
 
@@ -255,7 +263,6 @@ class OmniglotVinyals(VisionDataset):
 
     def __repr__(self):
 
-        # cap = "=================================================================="
         head = self.mode.upper() + " DataSet " + self.__class__.__name__
         body = ["Root location: {}".format(self.root),
                 "\t\tNumber of datapoints: {}".format(self.__len__()),
@@ -278,19 +285,19 @@ class OmniglotVinyals(VisionDataset):
         return
 
     # current version not use this func.
-    @staticmethod
-    def find_all_class(root):
-        """
-            this function aims to read the paths of Omniglot images,
-            and store the path info
-        """
-        alphabet_dirs = os.scandir(root)
-        classes = []
-        for alphabet in alphabet_dirs:
-            # the usage of "char.name" is Faster and available in Python 3.5 and above
-            classes += [os.path.join(alphabet.name, char.name) for char in os.scandir(alphabet) if char.is_dir()]
-        classes.sort()
-        return classes
+    # @staticmethod
+    # def find_all_class(root):
+    #     """
+    #         this function aims to read the paths of Omniglot images,
+    #         and store the path info
+    #     """
+    #     alphabet_dirs = os.scandir(root)
+    #     classes = []
+    #     for alphabet in alphabet_dirs:
+    #         # the usage of "char.name" is Faster and available in Python 3.5 and above
+    #         classes += [os.path.join(alphabet.name, char.name) for char in os.scandir(alphabet) if char.is_dir()]
+    #     classes.sort()
+    #     return classes
 
 
 if __name__ == "__main__":

@@ -27,8 +27,8 @@ class MiniImageNet(VisionDataset):
 
     r"""
         Arguments:
-            path_images (string, optional): the directory store Omniglot images.
-            mode (str, None, optional): within ['train', 'val', 'trainval', 'test'],
+            path_images (string, optional): the directory store MiniImageNet data.
+            mode (str, None, optional): within ['train', 'val', 'test'],
                 it decide to load which files for data-loader (default: None).
             loader (callable): A function to load a sample given its path.
                 (default: pil_grey_loader).
@@ -47,7 +47,6 @@ class MiniImageNet(VisionDataset):
         'train': __ravi_url + 'train.csv',
         'val': __ravi_url + 'val.csv',
     }
-    # __trans_opts = (0, 90, 180, 270)
 
     def __init__(self,
                  path_images=None,
@@ -59,7 +58,7 @@ class MiniImageNet(VisionDataset):
         logging.basicConfig(level=logging.INFO,
                             format="[%(asctime)s--%(name)s--%(module)s--%(levelname)s]: %(message)s")
 
-        # check image path
+        # set image directory
         self.path_images = path_images
         if self.path_images is None:
             self.path_images = os.path.join(os.getcwd(), "dataset\\miniImageNet")
@@ -68,14 +67,20 @@ class MiniImageNet(VisionDataset):
             logging.warning("no original mini-ImageNet image path")
             os.makedirs(self.path_images)
 
-        # check the data-set has or hasn't been prepared
-        self.root = os.path.join(self.path_images, 'images')
-        if not os.path.exists(self.root) or not len(os.listdir(self.root)):
+        # ------------------------------------------
+        # check the images have or not been prepared
+        # if not, prepare images
+        self.path_processed = os.path.join(self.path_images, 'images')
+        if not os.path.exists(self.path_processed) \
+                or not len(os.listdir(self.path_processed)):
             raise FileExistsError("images of mini-ImageNet should be download first\n"
-                                  "if you have download, please unzip images into file '%s' .\n"
-                                  "reference download url: %s" % (self.root, self.__img_urls))
+                                  "then please unzip images into directory '%s' .\n"
+                                  "reference download url: %s"
+                                  % (self.path_processed, self.__img_urls))
 
-        # check the train-validation-test split information has or hasn't been prepared
+        # -------------------------------------
+        # check the train-validation-test split
+        # information has or hasn't been prepared
         # if not, prepare
         self.path_split = os.path.join(self.path_images, "ravi_split")
         # check the split information directories do or not exist
@@ -88,11 +93,17 @@ class MiniImageNet(VisionDataset):
             logging.warning("no mini-ImageNet ravi-split info. files")
             self._download_split_info()
 
-        # define the training or testing tasks root
-        # for class attribute print
-        super(MiniImageNet, self).__init__(self.root,
+        # --------------------------------------
+        # after guaranteeing the images has been
+        # prepared in the setting path_images,
+        # set root and declare its father class
+        self.root = self.path_processed
+        super(MiniImageNet, self).__init__(self.path_processed,
                                            transform=transform,
                                            target_transform=target_transform)
+
+        # ---------------
+        # prepare dataset
 
         # check whether load train, validation, or test task set
         if mode is None:
@@ -103,15 +114,15 @@ class MiniImageNet(VisionDataset):
                              "['train', 'val'(validation), 'test'], "
                              "but got {} instead\n".format(mode))
 
-        # prepare data-set
-        classes, class_to_idx, samples = self._find_classes_items_from_ravi_protocol(mode, 'jpg')
+        # generate dataset
+        classes, class_to_idx, samples = self._find_classes_items(mode, 'jpg')
         if len(samples) == 0:
-            raise (RuntimeError("Found 0 files in subfolders of: " + self.root + "\n"
+            raise (RuntimeError("Found 0 files in sub-folders of: " + self.root + "\n"
                                 "Supported file-type is *.png"))
-        # samples_idx_in_classes_idx
         tasks = make_taskset(samples, class_to_idx)
 
-        # setting param
+        # -------------
+        # set variables
         self.loader = loader
         self.mode = mode
         self.classes = classes
@@ -119,6 +130,7 @@ class MiniImageNet(VisionDataset):
         self.samples = samples
         self.targets = [s[-1] for s in samples]
         self.tasks = tasks
+        # print self information
         logging.info(self)
 
     def _download_split_info(self):
@@ -135,7 +147,7 @@ class MiniImageNet(VisionDataset):
                     f.write(_data.read())
         logging.info("successfully download miniImageNet split info. (Sachin Ravi)")
 
-    def _find_classes_items_from_ravi_protocol(self, mode, extensions='jpg'):
+    def _find_classes_items(self, mode, extensions='jpg'):
 
         # get ravi split info. file
         cur_mode_file = os.path.join(self.path_split, mode + '.csv')
@@ -149,7 +161,7 @@ class MiniImageNet(VisionDataset):
         # formulate samples-set and the corresponding tasks-set
         images = []
         for _s, _cls in _items:
-            _file = os.path.join(self.root, _s)
+            _file = os.path.join(self.path_processed, _s)
             if self.__is_valid_file(_file, extensions):
                 if os.path.exists(_file):
                     item = (_file, class_to_idx[_cls])
@@ -187,7 +199,7 @@ class MiniImageNet(VisionDataset):
 
         # cap = "=================================================================="
         head = self.mode.upper() + " DataSet " + self.__class__.__name__
-        body = ["Root location: {}".format(self.root),
+        body = ["Root location: {}".format(self.path_processed),
                 "\t\tNumber of datapoints: {}".format(self.__len__()),
                 "\t\tNumber of classes: {}".format(len(self.tasks))]
         s_nums = [len(self.tasks[idx]) for idx in range(len(self.tasks))]

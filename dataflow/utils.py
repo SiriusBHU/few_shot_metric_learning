@@ -5,13 +5,6 @@ import torch
 from torch.utils.data import DataLoader
 
 
-def pil_grey_loader(path):
-    # open path as file to avoid ResourceWarning
-    with open(path, 'rb') as f:
-        img = Image.open(f)
-        return img.convert('L')
-
-
 def pil_rgb_loader(path):
     # open path as file to avoid ResourceWarning
     # (https://github.com/python-pillow/Pillow/issues/835)
@@ -20,12 +13,21 @@ def pil_rgb_loader(path):
         return img.convert('RGB')
 
 
+def pil_grey_loader(path):
+    with open(path, 'rb') as f:
+        img = Image.open(f)
+        return img.convert('L')
+
+
 def pil_array_to_image(arr):
     return Image.fromarray(arr)
 
 
 def make_taskset(samples, class_to_idx):
-
+    """
+        find the images' indexes of each classes
+        output a dict as {class index: [corresponding image indexes]}
+    """
     # initial task set
     tasks = dict()
     for _class, _class_idx in class_to_idx.items():

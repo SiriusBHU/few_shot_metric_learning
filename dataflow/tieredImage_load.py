@@ -26,7 +26,7 @@ class TieredImageNet(VisionDataset):
 
     r"""
         Arguments:
-            path_images (string, optional): the directory store Omniglot images.
+            path_images (string, optional): the directory store TieredImageNet data.
             mode (str, None, optional): within ['train', 'val', 'trainval', 'test'],
                 it decide to load which files for data-loader (default: None).
             loader (callable): A function to load a sample given its path.
@@ -39,14 +39,7 @@ class TieredImageNet(VisionDataset):
     """
     # define private values
     __img_urls = "https://drive.google.com/uc?id=1g1aIDy2Ar_MViF2gDXFYDBTR-HYecV07&export=download"
-    __ren_url = \
-        'https://raw.githubusercontent.com/jakesnell/prototypical-networks/master/data/miniImagenet/splits/ravi/'
-    __ren_protocol = {
-        'test': __ren_url + 'test.csv',
-        'train': __ren_url + 'train.csv',
-        'val': __ren_url + 'val.csv',
-    }
-    # __trans_opts = (0, 90, 180, 270)
+    __ren_protocol = ('test', 'train', 'val')
 
     def __init__(self,
                  path_images=None,
@@ -58,54 +51,63 @@ class TieredImageNet(VisionDataset):
         logging.basicConfig(level=logging.INFO,
                             format="[%(asctime)s--%(name)s--%(module)s--%(levelname)s]: %(message)s")
 
-        # check image path
+        # set image directory
         self.path_images = path_images
         if self.path_images is None:
             self.path_images = os.path.join(os.getcwd(), "dataset\\tieredImageNet")
 
-        # ################
+        # ----------------
         # check path exist
         # check tiered-ImageNet main path
         if not os.path.exists(self.path_images):
             logging.warning("no tiered-ImageNet data-set path")
             os.makedirs(self.path_images)
-
         # check the processed path
         self.path_processed = os.path.join(self.path_images, 'images')
         if not os.path.exists(self.path_processed):
             logging.warning("no tiered-ImageNet processed images' path")
             os.makedirs(self.path_processed)
-
         # check the split information path
         self.path_split = os.path.join(self.path_images, "split")
         if not os.path.exists(self.path_split):
             logging.warning("no tiered-ImageNet split info. path")
             os.makedirs(self.path_split)
-
-        self.path_pickle = os.path.join(self.path_images, 'pickle_files')
         # check the split information directories do or not exist
+        self.path_pickle = os.path.join(self.path_images, 'pickle_files')
         if not os.path.exists(self.path_pickle):
             logging.warning("no mini-ImageNet pickle path")
             os.makedirs(self.path_pickle)
 
-        # ############################################################################
-        # check the images and the corresponding split info have or not been processed
-        if not len(os.listdir(self.path_processed)) or len(os.listdir(self.path_split)) < 3:
+        # ------------------------------------------
+        # check the images and the corresponding
+        # split info have or not been prepared,
+        # if not, prepare them
+        if not len(os.listdir(self.path_processed)) \
+                or len(os.listdir(self.path_split)) < 3:
             logging.info("the tiered image has not been processed as image files")
 
-            # if no processed images and split info., check if there have pickle files
-            if not os.path.exists(self.path_pickle) or len(os.listdir(self.path_pickle)) < 8:
-                raise FileExistsError("pickled images of tiered-ImageNet should be download first\n"
-                                      "if you have download, please unzip the pickle files into '%s' .\n"
-                                      "reference download url: %s" % (self.path_pickle, self.__img_urls))
+            # if no processed images or split info.,
+            # check if there have the corresponding pickle files
+            if not os.path.exists(self.path_pickle) \
+                    or len(os.listdir(self.path_pickle)) < 8:
+                raise FileExistsError("pickled files of tiered-ImageNet should be download first\n"
+                                      "then please unzip the pickle files into '%s' .\n"
+                                      "reference download url: %s"
+                                      % (self.path_pickle, self.__img_urls))
             self._unpickle()
+
+        # --------------------------------------
+        # after guaranteeing the images has been
+        # prepared in the setting path_images,
+        # set root and declare its father class
         self.root = self.path_processed
         super(TieredImageNet, self).__init__(self.root,
                                              transform=transform,
                                              target_transform=target_transform)
-        logging.info("the Tiered ImageNet images have been prepared")
 
-        # ######################################################
+        # ---------------
+        # prepare dataset
+
         # check whether load train, validation, or test task set
         if mode is None:
             logging.info("default loading training task set")
@@ -115,20 +117,15 @@ class TieredImageNet(VisionDataset):
                              "['train', 'val'(validation), 'test'], "
                              "but got {} instead\n".format(mode))
 
-        # prepare data-set
-        import time
-        t1 = time.time()
+        # generate dataset
         classes, class_to_idx, samples = self._find_classes_items(mode, 'jpg')
-        t2 = time.time()
         if len(samples) == 0:
             raise (RuntimeError("Found 0 files in subfolders of: " + self.root + "\n"
                                 "Supported file-type is *.png"))
-        # samples_idx_in_classes_idx
         tasks = make_taskset(samples, class_to_idx)
-        t3 = time.time()
-        print(t2 - t1, t3 - t2)
 
-        # setting param
+        # -------------
+        # set variables
         self.loader = loader
         self.mode = mode
         self.classes = classes
@@ -136,6 +133,7 @@ class TieredImageNet(VisionDataset):
         self.samples = samples
         self.targets = [s[-1] for s in samples]
         self.tasks = tasks
+        # print self information
         logging.info(self)
 
     def _unpickle(self):
@@ -144,7 +142,7 @@ class TieredImageNet(VisionDataset):
             store images into processed directory, and
             save split information into split directory
         """
-        for mode in self.__ren_protocol.keys():
+        for mode in self.__ren_protocol:
             d_file, l_file = mode + '_images_png.pkl', mode + '_labels.pkl'
             with open(os.path.join(self.path_pickle, d_file), 'rb') as f:
                 data = pickle.load(f)

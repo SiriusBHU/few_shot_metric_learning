@@ -28,7 +28,10 @@ class CIFAR100(VisionDataset):
 
     r"""
         Arguments:
-            path_images (string, optional): the directory store Omniglot images.
+            path_images (str, optional): the directory store Omniglot images.
+            protocol (str, None, optional): within ['fc100', 'cifar_fs'],
+                it decide to load which protocol as the few-shot scenario
+                (default: None)
             mode (str, None, optional): within ['train', 'val', 'trainval', 'test'],
                 it decide to load which files for data-loader (default: None).
             loader (callable): A function to load a sample given its path.
@@ -62,9 +65,9 @@ class CIFAR100(VisionDataset):
 
     def __init__(self,
                  path_images=None,
-                 protocol='fc100',
+                 protocol=None,
                  mode=None,
-                 loader=pil_array_to_image,  # default_loader,
+                 loader=pil_array_to_image,
                  transform=None,
                  target_transform=None):
 
@@ -74,26 +77,34 @@ class CIFAR100(VisionDataset):
         # set image directory
         self.path_images = path_images
         if self.path_images is None:
-            self.path_images = os.path.join(os.getcwd(), "dataset\\Omniglot")
+            self.path_images = os.path.join(os.getcwd(), "dataset\\CIFAR100")
         # check the directory do or not exist
         if not os.path.exists(self.path_images):
-            logging.warning("no original Omniglot image path")
+            logging.warning("no original CIFAR100 image directory")
             os.makedirs(self.path_images)
 
-        # check the dataset has or not been prepared
-        # if not, prepare dataset
+        # ------------------------------------------
+        # check the images have or not been prepared
+        # if not, prepare images
         _files = os.listdir(self.path_images)
-
         if not len(_files) \
                 or 'train' not in _files \
                 or 'test' not in _files \
                 or 'meta' not in _files:
-            logging.warning("no CIFAR100 images")
+            logging.warning("no CIFAR100 pickled images")
             self._download_images()
+
+        # --------------------------------------
+        # after guaranteeing the images has been
+        # prepared in the setting path_images,
+        # set root and declare its father class
         self.root = self.path_images
         super(CIFAR100, self).__init__(self.root,
                                        transform=transform,
                                        target_transform=target_transform)
+
+        # ---------------
+        # prepare dataset
 
         # check loading protocol
         if protocol is None:
@@ -103,8 +114,8 @@ class CIFAR100(VisionDataset):
             raise ValueError("expected protocol should be within choices of "
                              "['fc100', 'cifar_fs'], "
                              "but got {} instead\n".format(protocol))
-
-        # check whether to load train, validation, or test task set
+        # check loading mode
+        # (whether to load train, validation, or test task set)
         if mode is None:
             logging.info("default loading training task set")
             mode = 'train'
@@ -113,16 +124,15 @@ class CIFAR100(VisionDataset):
                              "['train', 'val'(validation), 'trainval'(train + validation), 'test'], "
                              "but got {} instead\n".format(mode))
 
-        # prepare data-set
+        # generate data-set
         data, targets, classes, class_to_idx = self._load_images_find_classes(protocol, mode)
         if len(data) == 0:
-            raise (RuntimeError("read pickled files error"))
-
-        # samples_idx_in_classes_idx
+            raise RuntimeError("read pickled files error")
         tasks = make_taskset([(idx, cls) for idx, cls in enumerate(targets)],
                              class_to_idx)
 
-        # setting param
+        # -------------
+        # set variables
         self.loader = loader
         self.protocol = protocol
         self.mode = mode
@@ -132,6 +142,7 @@ class CIFAR100(VisionDataset):
         self.classes = classes
         self.class_to_idx = class_to_idx
         self.tasks = tasks
+        # print self information
         logging.info(self)
 
     def _download_images(self):
@@ -269,10 +280,10 @@ if __name__ == "__main__":
     fc100_set = CIFAR100(path_images=path_img,
                          protocol='fc100',
                          mode="train",
-                         transform=transforms.Compose([transforms.Resize((105, 105)),
-                                                     transforms.ToTensor(),
-                                                     transforms.Normalize(mean=(0.485, 0.456, 0.406),
-                                                                          std=(0.229, 0.224, 0.225))]))
+                         transform=transforms.Compose([transforms.Resize((32, 32)),
+                                                       transforms.ToTensor(),
+                                                       transforms.Normalize(mean=(0.485, 0.456, 0.406),
+                                                                            std=(0.229, 0.224, 0.225))]))
     fc100_loader = TaskLoader(fc100_set, n_way=5, k_shot=1, query_shot=5,
                               iterations=100,
                               batch_shuffle=True,
