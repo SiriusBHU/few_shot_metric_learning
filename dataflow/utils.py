@@ -20,6 +20,10 @@ def pil_rgb_loader(path):
         return img.convert('RGB')
 
 
+def pil_array_to_image(arr):
+    return Image.fromarray(arr)
+
+
 def make_taskset(samples, class_to_idx):
 
     # initial task set

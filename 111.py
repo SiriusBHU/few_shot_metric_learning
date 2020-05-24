@@ -38,3 +38,57 @@ ct_of_cls = np.array(ct_of_cls)
 
 def process_pkl2png():
     pass
+
+
+
+import os
+import pickle
+directory = 'E:\\Transferring_Datasets\\CIFAR100'
+with open(os.path.join(directory, 'meta'), 'rb') as fi:
+    meta = pickle.load(fi, encoding='latin1')
+
+fine_classes = {cls: idx for idx, cls in enumerate(meta['fine_label_names'])}
+coarse_classes = {cls: idx for idx, cls in enumerate(meta['coarse_label_names'])}
+
+
+split_mode = ('train', 'val', 'test')
+protocol = {mode: [] for mode in split_mode}
+directory_split = 'E:\\Transferring_Datasets\\CIFAR100\\bertinetto'
+for mode in split_mode:
+    with open(os.path.join(directory_split, mode + '.txt'), 'r') as ff:
+        for cls in ff.readlines():
+            cls = cls.strip()
+            protocol[mode].append(fine_classes[cls])
+print(protocol)
+
+
+import os
+import pickle
+directory = 'E:\\Transferring_Datasets\\CIFAR100'
+with open(os.path.join(directory, 'train'), 'rb') as fi:
+    entry = pickle.load(fi, encoding='latin1')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
