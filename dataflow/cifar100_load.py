@@ -211,7 +211,7 @@ class CIFAR100(VisionDataset):
         with open(os.path.join(self.path_images, 'meta'), 'rb') as fo:
             meta = pickle.load(fo, encoding='latin1')
             fine_classes = meta['fine_label_names']
-            coarse_classes = meta['coarse_label_names']
+            # coarse_classes = meta['coarse_label_names']
 
         # according to the protocol and mode,
         # extract the required class_index
@@ -219,8 +219,8 @@ class CIFAR100(VisionDataset):
             class_idx = self.__cifar_fs_protocol[mode]
         else:
             coarse_idx = self.__fc100_protocol[mode]
-            _coords = [coarse_labels == c for c in coarse_idx]
-            class_idx = np.unique(np.concatenate([fine_labels[_idx] for _idx in _coords], axis=0))
+            _coordinates = [coarse_labels == c for c in coarse_idx]
+            class_idx = np.unique(np.concatenate([fine_labels[_idx] for _idx in _coordinates], axis=0))
 
         # extract the corresponding data and targets
         data, targets, classes, class_to_idx = [], [], [], {}
