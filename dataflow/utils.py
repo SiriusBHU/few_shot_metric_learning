@@ -1,4 +1,3 @@
-import os
 from PIL import Image
 import numpy as np
 import torch
@@ -40,7 +39,7 @@ def make_taskset(samples, class_to_idx):
     return tasks
 
 
-class TaskBatchSampler(object):
+class MetaBatchSampler(object):
 
     r"""
         Arguments:
@@ -167,7 +166,7 @@ class TaskBatchSampler(object):
         return self._num_tasks
 
 
-class TaskLoader(object):
+class MetaTaskLoader(object):
     r"""
         Arguments:
             data_source (base-class Dataset): dataset from  which to load the data.
@@ -240,7 +239,7 @@ class TaskLoader(object):
             t = task_batch_sampler
             iterations, n_way, k_shot, query_shot = t.iterations, t.n_way, t.k_shot, t.query_shot
         else:
-            task_batch_sampler = TaskBatchSampler(self.data_source,
+            task_batch_sampler = MetaBatchSampler(self.data_source,
                                                   iterations=iterations,
                                                   task_shuffle=task_shuffle,
                                                   batch_shuffle=batch_shuffle,

@@ -22,7 +22,7 @@ from torchvision.datasets.vision import VisionDataset
 from dataflow.utils import make_taskset, pil_grey_loader
 
 
-class OmniglotVinyals(VisionDataset):
+class Omniglot(VisionDataset):
 
     r"""
         Arguments:
@@ -110,9 +110,9 @@ class OmniglotVinyals(VisionDataset):
         # prepared in the setting path_images,
         # set root and declare its father class
         self.root = self.path_images
-        super(OmniglotVinyals, self).__init__(self.root,
-                                              transform=transform,
-                                              target_transform=target_transform)
+        super(Omniglot, self).__init__(self.root,
+                                       transform=transform,
+                                       target_transform=target_transform)
 
         # ---------------
         # prepare dataset
@@ -225,7 +225,7 @@ class OmniglotVinyals(VisionDataset):
         images = []
         dir = os.path.expanduser(dir)
         for target in sorted(class_to_idx.keys()):
-            tar_base, _t = target.strip().split(os.altsep + 'rot')
+            tar_base, _t = target.strip().split("/" + 'rot')
             d = os.path.join(dir, tar_base)
             if not os.path.isdir(d):
                 continue
@@ -303,19 +303,19 @@ class OmniglotVinyals(VisionDataset):
 if __name__ == "__main__":
 
     from torchvision import transforms
-    from dataflow.utils import TaskBatchSampler, TaskLoader
+    from dataflow.utils import MetaBatchSampler, MetaTaskLoader
 
     path_cur = os.getcwd()
     path_img = "E:\\Transferring_Datasets\\Omniglot"   # path_cur + "/.."    "E:\\Transferring_Datasets\\Omniglot"
-    omi_set = OmniglotVinyals(path_images=path_img,
-                              mode="train",
-                              transform=transforms.Compose([transforms.Resize((105, 105)),
+    omi_set = Omniglot(path_images=path_img,
+                       mode="train",
+                       transform=transforms.Compose([transforms.Resize((105, 105)),
                                                             transforms.ToTensor(),
                                                             transforms.Normalize(mean=[0.9], std=[0.3])]))
-    omi_task_set = TaskLoader(omi_set, n_way=5, k_shot=1, query_shot=5,
-                              batch_shuffle=True,
-                              task_shuffle=True,
-                              num_workers=2)
+    omi_task_set = MetaTaskLoader(omi_set, n_way=5, k_shot=1, query_shot=5,
+                                  batch_shuffle=True,
+                                  task_shuffle=True,
+                                  num_workers=2)
     for epoch in range(5):
         for i, (s_samples, s_labels, q_samples, q_labels) in enumerate(omi_task_set):
             print(s_labels, q_labels)

@@ -230,7 +230,7 @@ class MiniImageNet(VisionDataset):
 if __name__ == "__main__":
 
     from torchvision import transforms
-    from dataflow.utils import TaskBatchSampler, TaskLoader
+    from dataflow.utils import MetaBatchSampler, MetaTaskLoader
     import time
 
     path_cur = os.getcwd()
@@ -241,12 +241,12 @@ if __name__ == "__main__":
                                                               transforms.ToTensor(),
                                                               transforms.Normalize(mean=(0.485, 0.456, 0.406),
                                                                                    std=(0.229, 0.224, 0.225))]))
-    mini_img_loader = TaskLoader(mini_img_set,
-                                 iterations=100,
-                                 n_way=5, k_shot=1, query_shot=5,
-                                 batch_shuffle=True,
-                                 task_shuffle=True,
-                                 num_workers=2)
+    mini_img_loader = MetaTaskLoader(mini_img_set,
+                                     iterations=100,
+                                     n_way=5, k_shot=1, query_shot=5,
+                                     batch_shuffle=True,
+                                     task_shuffle=True,
+                                     num_workers=2)
     t1 = time.time()
     for i, (s_samples, s_labels, q_samples, q_labels) in enumerate(mini_img_loader):
         t2 = time.time()

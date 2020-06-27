@@ -46,6 +46,7 @@ class CIFAR100(VisionDataset):
     """
     # define private values
     __img_url = "https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz"
+    # key:'trainval' means train + val
     __fc100_protocol = {
         'train': [1, 2, 3, 4, 5, 6, 9, 10, 15, 17, 18, 19],
         'val': [8, 11, 13, 16],
@@ -169,7 +170,7 @@ class CIFAR100(VisionDataset):
             url = self.__img_url
             logging.info("--> downloading from %s" % url)
             _data = urllib.request.urlopen(url)
-            _file = url.strip().split(os.altsep)[-1]
+            _file = url.strip().split("/")[-1]
             _file = os.path.join(self.path_images, _file)
             with open(_file, "wb") as f:
                 f.write(_data.read())
@@ -283,7 +284,7 @@ class CIFAR100(VisionDataset):
 if __name__ == "__main__":
 
     from torchvision import transforms
-    from dataflow.utils import TaskLoader
+    from dataflow.utils import MetaTaskLoader
 
     path_cur = os.getcwd()
     path_img = "E:\\Transferring_Datasets\\CIFAR100"  # path_cur + "/.."    "E:\\Transferring_Datasets\\Omniglot"
@@ -292,13 +293,13 @@ if __name__ == "__main__":
                          mode="train",
                          transform=transforms.Compose([transforms.Resize((32, 32)),
                                                        transforms.ToTensor(),
-                                                       transforms.Normalize(mean=(0.485, 0.456, 0.406),
-                                                                            std=(0.229, 0.224, 0.225))]))
-    fc100_loader = TaskLoader(fc100_set, n_way=5, k_shot=1, query_shot=5,
-                              iterations=100,
-                              batch_shuffle=True,
-                              task_shuffle=True,
-                              num_workers=2)
+                                                       transforms.Normalize(mean=(0.5071, 0.4867, 0.4408),
+                                                                            std=(0.2675, 0.2565, 0.2761))]))
+    fc100_loader = MetaTaskLoader(fc100_set, n_way=5, k_shot=1, query_shot=5,
+                                  iterations=100,
+                                  batch_shuffle=True,
+                                  task_shuffle=True,
+                                  num_workers=2)
 
     import time
 

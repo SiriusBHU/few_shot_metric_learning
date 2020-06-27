@@ -1,9 +1,11 @@
 import torch
 import torch.optim as optim
 from torch.nn.init import kaiming_uniform_
-from dataflow.omniglot_load import OmniglotVinyals
+from dataflow.omniglot_load import Omniglot
 from dataflow.miniImage_load import MiniImageNet
-from dataflow.utils import TaskLoader
+from dataflow.tieredImage_load import TieredImageNet
+from dataflow.cifar100_load import CIFAR100
+from dataflow.utils import MetaTaskLoader
 from torchvision import transforms
 import time
 import os
@@ -18,10 +20,20 @@ def data_loader_preparation(data_choice,
 
     if data_choice == 'Omniglot':
         path_img = "E:\\Transferring_Datasets\\Omniglot"
-        SetInit = OmniglotVinyals
+        SetInit = Omniglot
+        mean, std = (0.9,), (0.3,)
     elif data_choice == 'miniImageNet':
         path_img = "D:\\Transferring_Datasets\\Mini_ImageNet"
         SetInit = MiniImageNet
+        mean, std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+    elif data_choice == "tieredImageNet":
+        path_img = "D:\\Transferring_Datasets\\Tiered_ImageNet"
+        SetInit = MiniImageNet
+        mean, std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+    elif data_choice == "cifar100_fs" or data_choice == "fc100":
+        path_img = "D:\\Transferring_Datasets\\Tiered_ImageNet"
+        SetInit = TieredImageNet
+        mean, std = (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
     else:
         raise AttributeError("error")
 
@@ -33,12 +45,12 @@ def data_loader_preparation(data_choice,
     test_set = init_dataset(path_img, "test")
 
     def init_loader(dataset, iterations, way, shot, query):
-        return TaskLoader(dataset,
-                          iterations=iterations,
-                          n_way=way, k_shot=shot, query_shot=query,
-                          batch_shuffle=batch_shuffle,
-                          task_shuffle=task_shuffle,
-                          num_workers=2)
+        return MetaTaskLoader(dataset,
+                              iterations=iterations,
+                              n_way=way, k_shot=shot, query_shot=query,
+                              batch_shuffle=batch_shuffle,
+                              task_shuffle=task_shuffle,
+                              num_workers=2)
 
     train_loader = init_loader(train_set, train_iterations, train_way, train_shot, train_query)
     val_loader = init_loader(val_set, test_iterations, test_way, train_shot, train_query)
@@ -56,6 +68,15 @@ def weight_init(m):
         kaiming_uniform_(m.weight.data)
     if class_name.find('BatchNorm') != -1:
         torch.nn.init.uniform_(m.weight)
+
+
+def adjust_learning_rate(lr, epoch, decay_epochs, decay_rate, optimizer):
+    """Sets the learning rate to the initial LR decayed by decay rate every steep step"""
+    steps = np.sum(epoch > np.asarray(decay_epochs))
+    if steps > 0:
+        new_lr = lr * (decay_rate ** steps)
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = new_lr
 
 
 class NetFlow(object):
@@ -80,11 +101,11 @@ class NetFlow(object):
         # set path for param dump and load
         self.path_cur = os.getcwd()
 
-    def train(self, train_loader, val_loader, net_name, is_dump=False):
+    def train(self, train_loader, val_loader, net_name, is_dump=False, path_dump=None):
 
         # dump path generate
-        if is_dump:
-            self.make_dump_directory(net_name)
+        if is_dump and path_dump is not None:
+            path_dump = self.make_dump_directory(net_name)
 
         # set net, optimizer, lr_scheduler
         net = self.net
@@ -96,8 +117,7 @@ class NetFlow(object):
         net.cuda()
 
         # training period
-        LOSS_train, ACC_train, LOSS_val, ACC_val = [], [], [], []
-        MAX_ACC = 0
+        LOG, MAX_VAL_ACC = [], 0
         for epoch in range(EPOCHS):
 
             net.train()
@@ -165,11 +185,11 @@ class NetFlow(object):
 
         # set parameter dump directory
         cur_time = time.strftime('%Y.%m.%d_%H.%M.%S', time.localtime(time.time()))
-        self.path_dump = self.path_cur + "\\dataflow\\paramcache\\%s_%s" % (net_name, cur_time)
+        path_dump = self.path_cur + "\\paramcache\\%s_%s" % (net_name, cur_time)
 
-        if not os.path.exists(self.path_dump):
-            os.mkdir(self.path_dump)
-        return
+        if not os.path.exists(path_dump):
+            os.mkdir(path_dump)
+        return path_dump
 
     def load_param(self, net_name, param_file=None, param_path=None):
 
@@ -189,9 +209,12 @@ class NetFlow(object):
         self.net.load_state_dict(torch.load(load_file))
         self.net.cuda()
 
-    def dump_param(self, net_name, step):
+    def dump_param(self, path_dump, net_name, epoch):
 
-        dump_name = os.path.join(self.path_dump, '%s_params_%s.pkl' % (net_name, str(step).zfill(4)))
+        if isinstance(epoch, int):
+            epoch = str(epoch).zfill(4)
+
+        dump_name = os.path.join(path_dump, '%s_params_%s.pth' % (net_name, epoch))
         torch.save(self.net.state_dict(), dump_name)
         return
 
